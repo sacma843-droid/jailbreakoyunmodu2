@@ -1,6 +1,5 @@
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
-using CounterStrikeSharp.API.Core.Attributes.Registration;
 using CounterStrikeSharp.API.Modules.Commands;
 using CounterStrikeSharp.API.Modules.Utils;
 using CounterStrikeSharp.API.Modules.Timers;
@@ -19,12 +18,14 @@ public class JailbreakPlugin : BasePlugin
         // 1) /jointeam komutunu engelle
         AddCommandListener("jointeam", OnJoinTeamCommand);
 
-        // 3) Sadece CT konusabilsin
+        // !hucre1 komutu icin chat mesajlarini dinle (CT sayisi 0 ise kapilari acar)
         AddCommandListener("say", OnSayCommand);
         AddCommandListener("say_team", OnSayCommand);
 
-        // Oyuncu sunucuya girince otomatik T yap
-        RegisterListener<Listeners.OnClientPutInServer>(OnClientPutInServer);
+        // Eventler
+        RegisterEventHandler<EventPlayerSpawn>(OnPlayerSpawn);
+        RegisterEventHandler<EventPlayerTeam>(OnPlayerTeam);
+        RegisterEventHandler<EventRoundStart>(OnRoundStart);
     }
 
     // ================== 1) /jointeam ENGELLE ==================
@@ -37,7 +38,7 @@ public class JailbreakPlugin : BasePlugin
         {
             player.ChangeTeam(CsTeam.Terrorist);
         }
-        return HookResult.Stop;
+        return HookResult.Stop; // komutu tamamen engelle
     }
 
     // ================== 2) Otomatik T takimina katilma ==================
@@ -60,6 +61,7 @@ public class JailbreakPlugin : BasePlugin
         return HookResult.Continue;
     }
 
+    [GameEventHandler]
     public void OnClientPutInServer(int slot)
     {
         var player = Utilities.GetPlayerFromSlot(slot);
@@ -75,41 +77,47 @@ public class JailbreakPlugin : BasePlugin
         });
     }
 
-    // ================== 3) Sadece CT konusabilsin ==================
+    // ================== !hucre1 komutuyla kapi acma ==================
     private HookResult OnSayCommand(CCSPlayerController? player, CommandInfo info)
     {
         if (player == null || !player.IsValid)
             return HookResult.Continue;
 
-        if (player.Team != CsTeam.CounterTerrorist)
+        string message = (info.GetArg(1) ?? "").Trim();
+
+        if (message.Equals("!hucre1", StringComparison.OrdinalIgnoreCase))
         {
-            player.PrintToChat(" \x04[JB]\x01 Sadece CT takimi konusabilir!");
-            return HookResult.Stop;
+            OpenAllDoors();
+            return HookResult.Handled; // komut mesaji chatte gozukmesin
         }
+
+        // Diger tum mesajlar serbest, kisitlama yok
         return HookResult.Continue;
     }
 
     // ================== 4/6/7) Spawnda silah sifirla + takima gore silah ver ==================
-    [GameEventHandler]
-    public HookResult OnPlayerSpawn(EventPlayerSpawn @event, GameEventInfo info)
+    private HookResult OnPlayerSpawn(EventPlayerSpawn @event, GameEventInfo info)
     {
         var player = @event.Userid;
-        if (player == null || !player.IsValid || !player.PawnIsAlive)
+        if (player == null || !player.IsValid || player.PawnIsAlive == false)
             return HookResult.Continue;
 
         AddTimer(0.1f, () =>
         {
-            if (!player.IsValid || !player.PawnIsAlive) return;
+            if (!player.IsValid || player.PawnIsAlive == false) return;
 
-            // Tum silahlari temizle
-            player.RemoveWeapons();
+            var pawn = player.PlayerPawn.Value;
+            if (pawn == null) return;
 
-            // T takimi sadece bicak
+            // Tum silahlari at
+            pawn.WeaponServices?.RemoveWeapons();
+
+            // 6) T takimi sadece bicak
             if (player.Team == CsTeam.Terrorist)
             {
                 player.GiveNamedItem("weapon_knife");
             }
-            // CT takimi varsayilan silahlar
+            // 7) CT takimi varsayilan silahlari
             else if (player.Team == CsTeam.CounterTerrorist)
             {
                 player.GiveNamedItem("weapon_deagle");
@@ -121,33 +129,7 @@ public class JailbreakPlugin : BasePlugin
         return HookResult.Continue;
     }
 
-    // ================== 5) CT kalmayinca kapilar acilsin ==================
-    [GameEventHandler(HookMode.Post)]
-    public HookResult OnPlayerDeath(EventPlayerDeath @event, GameEventInfo info)
-    {
-        CheckCtCount();
-        return HookResult.Continue;
-    }
-
-    [GameEventHandler(HookMode.Post)]
-    public HookResult OnPlayerDisconnect(EventPlayerDisconnect @event, GameEventInfo info)
-    {
-        AddTimer(0.2f, CheckCtCount);
-        return HookResult.Continue;
-    }
-
-    private void CheckCtCount()
-    {
-        int ctCount = Utilities.GetPlayers()
-            .Count(p => p.IsValid && p.PawnIsAlive && p.Team == CsTeam.CounterTerrorist);
-
-        if (ctCount == 0)
-        {
-            OpenAllDoors();
-            Server.PrintToChatAll(" \x04[JB]\x01 Sunucuda hic CT kalmadi! Tum kapilar aciliyor...");
-        }
-    }
-
+    // ================== 5) !hucre1 ile kapi acma ==================
     private void OpenAllDoors()
     {
         foreach (var door in Utilities.FindAllEntitiesByDesignerName<CBaseEntity>("prop_door_rotating"))
@@ -169,8 +151,7 @@ public class JailbreakPlugin : BasePlugin
     }
 
     // ================== 8) Round basi komutlari ==================
-    [GameEventHandler]
-    public HookResult OnRoundStart(EventRoundStart @event, GameEventInfo info)
+    private HookResult OnRoundStart(EventRoundStart @event, GameEventInfo info)
     {
         Server.ExecuteCommand("sv_gravity 800");
         Server.ExecuteCommand("mp_teammates_are_enemies 0");
