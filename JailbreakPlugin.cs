@@ -1,5 +1,6 @@
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
+using CounterStrikeSharp.API.Core.Attributes.Registration;
 using CounterStrikeSharp.API.Modules.Commands;
 using CounterStrikeSharp.API.Modules.Utils;
 using CounterStrikeSharp.API.Modules.Timers;
@@ -22,12 +23,8 @@ public class JailbreakPlugin : BasePlugin
         AddCommandListener("say", OnSayCommand);
         AddCommandListener("say_team", OnSayCommand);
 
-        // Eventler
-        RegisterEventHandler<EventPlayerSpawn>(OnPlayerSpawn);
-        RegisterEventHandler<EventPlayerTeam>(OnPlayerTeam);
-        RegisterEventHandler<EventPlayerDeath>(OnPlayerDeath, HookMode.Post);
-        RegisterEventHandler<EventPlayerDisconnect>(OnPlayerDisconnect, HookMode.Post);
-        RegisterEventHandler<EventRoundStart>(OnRoundStart);
+        // Listener (attribute ile de yapılabilir, ama burada açıkça kaydettik)
+        RegisterListener<Listeners.OnClientPutInServer>(OnClientPutInServer);
     }
 
     // ================== 1) /jointeam ENGELLE ==================
@@ -63,7 +60,6 @@ public class JailbreakPlugin : BasePlugin
         return HookResult.Continue;
     }
 
-    [GameEventHandler]
     public void OnClientPutInServer(int slot)
     {
         var player = Utilities.GetPlayerFromSlot(slot);
@@ -94,7 +90,8 @@ public class JailbreakPlugin : BasePlugin
     }
 
     // ================== 4/6/7) Spawnda silah sifirla + takima gore silah ver ==================
-    private HookResult OnPlayerSpawn(EventPlayerSpawn @event, GameEventInfo info)
+    [GameEventHandler]
+    public HookResult OnPlayerSpawn(EventPlayerSpawn @event, GameEventInfo info)
     {
         var player = @event.Userid;
         if (player == null || !player.IsValid || player.PawnIsAlive == false)
@@ -128,13 +125,15 @@ public class JailbreakPlugin : BasePlugin
     }
 
     // ================== 5) CT kalmayinca kapilar acilsin ==================
-    private HookResult OnPlayerDeath(EventPlayerDeath @event, GameEventInfo info)
+    [GameEventHandler(HookMode.Post)]
+    public HookResult OnPlayerDeath(EventPlayerDeath @event, GameEventInfo info)
     {
         CheckCtCount();
         return HookResult.Continue;
     }
 
-    private HookResult OnPlayerDisconnect(EventPlayerDisconnect @event, GameEventInfo info)
+    [GameEventHandler(HookMode.Post)]
+    public HookResult OnPlayerDisconnect(EventPlayerDisconnect @event, GameEventInfo info)
     {
         AddTimer(0.2f, CheckCtCount);
         return HookResult.Continue;
@@ -173,7 +172,8 @@ public class JailbreakPlugin : BasePlugin
     }
 
     // ================== 8) Round basi komutlari ==================
-    private HookResult OnRoundStart(EventRoundStart @event, GameEventInfo info)
+    [GameEventHandler]
+    public HookResult OnRoundStart(EventRoundStart @event, GameEventInfo info)
     {
         Server.ExecuteCommand("sv_gravity 800");
         Server.ExecuteCommand("mp_teammates_are_enemies 0");
