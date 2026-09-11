@@ -1,0 +1,34 @@
+name: Build JailbreakBase
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Kodu indir
+        uses: actions/checkout@v4
+
+      - name: .NET 10 SDK kur
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Bagimliliklari geri yukle
+        run: dotnet restore JailbreakBase.csproj
+
+      - name: Derle (Release)
+        run: dotnet build JailbreakBase.csproj -c Release --no-restore
+
+      - name: Ciktiyi artifact olarak yukle
+        uses: actions/upload-artifact@v4
+        with:
+          name: JailbreakBase
+          path: bin/Release/net10.0/
+          if-no-files-found: error
