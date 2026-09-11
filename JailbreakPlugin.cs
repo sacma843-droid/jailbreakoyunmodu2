@@ -18,13 +18,16 @@ public class JailbreakPlugin : BasePlugin
         // 1) /jointeam komutunu engelle
         AddCommandListener("jointeam", OnJoinTeamCommand);
 
-        // !hucre1 komutu icin chat mesajlarini dinle (CT sayisi 0 ise kapilari acar)
+        // !hucre1 komutu icin chat mesajlarini dinle
         AddCommandListener("say", OnSayCommand);
         AddCommandListener("say_team", OnSayCommand);
 
         // Eventler
         RegisterEventHandler<EventPlayerSpawn>(OnPlayerSpawn);
         RegisterEventHandler<EventRoundStart>(OnRoundStart);
+
+        // Oyuncu sunucuya girince otomatik T yap
+        RegisterListener<Listeners.OnClientPutInServer>(OnClientPutInServer);
     }
 
     // ================== 1) /jointeam ENGELLE ==================
@@ -37,11 +40,10 @@ public class JailbreakPlugin : BasePlugin
         {
             player.ChangeTeam(CsTeam.Terrorist);
         }
-        return HookResult.Stop; // komutu tamamen engelle
+        return HookResult.Stop;
     }
 
-    [GameEventHandler]
-    public void OnClientPutInServer(int slot)
+    private void OnClientPutInServer(int slot)
     {
         var player = Utilities.GetPlayerFromSlot(slot);
         if (player == null) return;
@@ -67,10 +69,9 @@ public class JailbreakPlugin : BasePlugin
         if (message.Equals("!hucre1", StringComparison.OrdinalIgnoreCase))
         {
             OpenAllDoors();
-            return HookResult.Handled; // komut mesaji chatte gozukmesin
+            return HookResult.Handled;
         }
 
-        // Diger tum mesajlar serbest, kisitlama yok
         return HookResult.Continue;
     }
 
@@ -78,25 +79,22 @@ public class JailbreakPlugin : BasePlugin
     private HookResult OnPlayerSpawn(EventPlayerSpawn @event, GameEventInfo info)
     {
         var player = @event.Userid;
-        if (player == null || !player.IsValid || player.PawnIsAlive == false)
+        if (player == null || !player.IsValid || !player.PawnIsAlive)
             return HookResult.Continue;
 
         AddTimer(0.1f, () =>
         {
-            if (!player.IsValid || player.PawnIsAlive == false) return;
+            if (!player.IsValid || !player.PawnIsAlive) return;
 
-            var pawn = player.PlayerPawn.Value;
-            if (pawn == null) return;
+            // Tum silahlari temizle
+            player.RemoveWeapons();
 
-            // Tum silahlari at
-            pawn.WeaponServices?.RemoveWeapons();
-
-            // 6) T takimi sadece bicak
+            // T takimi sadece bicak
             if (player.Team == CsTeam.Terrorist)
             {
                 player.GiveNamedItem("weapon_knife");
             }
-            // 7) CT takimi varsayilan silahlari
+            // CT takimi varsayilan silahlar
             else if (player.Team == CsTeam.CounterTerrorist)
             {
                 player.GiveNamedItem("weapon_deagle");
@@ -108,7 +106,7 @@ public class JailbreakPlugin : BasePlugin
         return HookResult.Continue;
     }
 
-    // ================== 5) !hucre1 ile kapi acma ==================
+    // ================== !hucre1 ile kapi acma ==================
     private void OpenAllDoors()
     {
         foreach (var door in Utilities.FindAllEntitiesByDesignerName<CBaseEntity>("prop_door_rotating"))
