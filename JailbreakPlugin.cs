@@ -23,7 +23,7 @@ public class JailbreakPlugin : BasePlugin
         AddCommandListener("say", OnSayCommand);
         AddCommandListener("say_team", OnSayCommand);
 
-        // Listener (attribute ile de yapılabilir, ama burada açıkça kaydettik)
+        // Oyuncu sunucuya girince otomatik T yap
         RegisterListener<Listeners.OnClientPutInServer>(OnClientPutInServer);
     }
 
@@ -37,7 +37,7 @@ public class JailbreakPlugin : BasePlugin
         {
             player.ChangeTeam(CsTeam.Terrorist);
         }
-        return HookResult.Stop; // komutu tamamen engelle
+        return HookResult.Stop;
     }
 
     // ================== 2) Otomatik T takimina katilma ==================
@@ -94,25 +94,22 @@ public class JailbreakPlugin : BasePlugin
     public HookResult OnPlayerSpawn(EventPlayerSpawn @event, GameEventInfo info)
     {
         var player = @event.Userid;
-        if (player == null || !player.IsValid || player.PawnIsAlive == false)
+        if (player == null || !player.IsValid || !player.PawnIsAlive)
             return HookResult.Continue;
 
         AddTimer(0.1f, () =>
         {
-            if (!player.IsValid || player.PawnIsAlive == false) return;
+            if (!player.IsValid || !player.PawnIsAlive) return;
 
-            var pawn = player.PlayerPawn.Value;
-            if (pawn == null) return;
+            // Tum silahlari temizle
+            player.RemoveWeapons();
 
-            // Tum silahlari at
-            pawn.WeaponServices?.RemoveWeapons();
-
-            // 6) T takimi sadece bicak
+            // T takimi sadece bicak
             if (player.Team == CsTeam.Terrorist)
             {
                 player.GiveNamedItem("weapon_knife");
             }
-            // 7) CT takimi varsayilan silahlari
+            // CT takimi varsayilan silahlar
             else if (player.Team == CsTeam.CounterTerrorist)
             {
                 player.GiveNamedItem("weapon_deagle");
