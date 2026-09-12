@@ -14,29 +14,22 @@ public class JailbreakPlugin : BasePlugin
     public override string ModuleAuthor => "Claude";
     public override string ModuleDescription => "Temel Jailbreak oyun modu ozellikleri (CounterStrikeSharp)";
 
-    // ctrev icin paylasimli hak sayaci (tum CT takimi icin ortak)
     private const int CtRevDefaultCharges = 3;
     private int _ctRevRemaining = CtRevDefaultCharges;
 
     public override void Load(bool hotReload)
     {
-        // 1) /jointeam komutunu engelle
         AddCommandListener("jointeam", OnJoinTeamCommand);
-
-        // Chat komutlarini dinle: !hucre1, !mute, !unmute, !ctrev0
         AddCommandListener("say", OnSayCommand);
         AddCommandListener("say_team", OnSayCommand);
 
-        // Eventler
         RegisterEventHandler<EventPlayerSpawn>(OnPlayerSpawn);
         RegisterEventHandler<EventPlayerDeath>(OnPlayerDeath, HookMode.Post);
         RegisterEventHandler<EventRoundStart>(OnRoundStart);
 
-        // Oyuncu sunucuya girince otomatik T yap
         RegisterListener<Listeners.OnClientPutInServer>(OnClientPutInServer);
     }
 
-    // ================== 1) /jointeam ENGELLE ==================
     private HookResult OnJoinTeamCommand(CCSPlayerController? player, CommandInfo info)
     {
         if (player == null || !player.IsValid)
@@ -64,7 +57,6 @@ public class JailbreakPlugin : BasePlugin
         });
     }
 
-    // ================== Chat komutlari: !hucre1 / !mute / !unmute / !ctrev0 ==================
     private HookResult OnSayCommand(CCSPlayerController? player, CommandInfo info)
     {
         if (player == null || !player.IsValid)
@@ -100,56 +92,55 @@ public class JailbreakPlugin : BasePlugin
         return HookResult.Continue;
     }
 
-    // ================== T takimi ses kisitlamasi: !mute / !unmute ==================
     private void HandleUnmute(CCSPlayerController caller, string arg)
     {
         if (string.IsNullOrEmpty(arg))
         {
             SetVoiceMuted(caller, false);
-            caller.PrintToChat(" \x04[JB]\x01 Sesin acildi.");
+            caller.PrintToChat($" {ChatColors.Green}[JB]{ChatColors.Default} Sesin açıldı.");
             return;
         }
 
         if (!AdminManager.PlayerHasPermissions(caller, "@css/generic"))
         {
-            caller.PrintToChat(" \x04[JB]\x01 Bu islem icin yetkin yok.");
+            caller.PrintToChat($" {ChatColors.Red}[JB]{ChatColors.Default} Bu işlem için yetkin yok.");
             return;
         }
 
         var target = FindPlayerByName(arg);
         if (target == null)
         {
-            caller.PrintToChat(" \x04[JB]\x01 Oyuncu bulunamadi.");
+            caller.PrintToChat($" {ChatColors.Red}[JB]{ChatColors.Default} Oyuncu bulunamadı.");
             return;
         }
 
         SetVoiceMuted(target, false);
-        caller.PrintToChat($" \x04[JB]\x01 {target.PlayerName} adli oyuncunun sesi acildi.");
+        caller.PrintToChat($" {ChatColors.Green}[JB]{ChatColors.Default} {ChatColors.Lime}{target.PlayerName}{ChatColors.Default} adlı oyuncunun sesi açıldı.");
     }
 
     private void HandleMute(CCSPlayerController caller, string arg)
     {
         if (!AdminManager.PlayerHasPermissions(caller, "@css/generic"))
         {
-            caller.PrintToChat(" \x04[JB]\x01 Bu islem icin yetkin yok.");
+            caller.PrintToChat($" {ChatColors.Red}[JB]{ChatColors.Default} Bu işlem için yetkin yok.");
             return;
         }
 
         if (string.IsNullOrEmpty(arg))
         {
-            caller.PrintToChat(" \x04[JB]\x01 Kullanim: !mute <oyuncu adi>");
+            caller.PrintToChat($" {ChatColors.Red}[JB]{ChatColors.Default} Kullanım: !mute <oyuncu adı>");
             return;
         }
 
         var target = FindPlayerByName(arg);
         if (target == null)
         {
-            caller.PrintToChat(" \x04[JB]\x01 Oyuncu bulunamadi.");
+            caller.PrintToChat($" {ChatColors.Red}[JB]{ChatColors.Default} Oyuncu bulunamadı.");
             return;
         }
 
         SetVoiceMuted(target, true);
-        caller.PrintToChat($" \x04[JB]\x01 {target.PlayerName} susturuldu.");
+        caller.PrintToChat($" {ChatColors.Red}[JB]{ChatColors.Default} {ChatColors.Lime}{target.PlayerName}{ChatColors.Default} susturuldu.");
     }
 
     private void SetVoiceMuted(CCSPlayerController player, bool muted)
@@ -163,20 +154,18 @@ public class JailbreakPlugin : BasePlugin
             .FirstOrDefault(p => p.IsValid && p.PlayerName.Contains(partialName, StringComparison.OrdinalIgnoreCase));
     }
 
-    // ================== ctrev: paylasimli CT rev hakki sifirlama ==================
     private void HandleCtRevReset(CCSPlayerController caller)
     {
         if (!AdminManager.PlayerHasPermissions(caller, "@css/generic"))
         {
-            caller.PrintToChat(" \x04[JB]\x01 Bu islem icin yetkin yok.");
+            caller.PrintToChat($" {ChatColors.Red}[JB]{ChatColors.Default} Bu işlem için yetkin yok.");
             return;
         }
 
         _ctRevRemaining = CtRevDefaultCharges;
-        Server.PrintToChatAll($" \x04[JB]\x01 CT rev haklari sifirlandi! Yeni hak: {CtRevDefaultCharges}");
+        Server.PrintToChatAll($" {ChatColors.Green}[JB]{ChatColors.Default} CT rev hakları sıfırlandı! Yeni hak: {ChatColors.Gold}{CtRevDefaultCharges}");
     }
 
-    // ================== 4/6/7) Spawnda silah sifirla + takima gore silah ver + ses ayari ==================
     private HookResult OnPlayerSpawn(EventPlayerSpawn @event, GameEventInfo info)
     {
         var player = @event.Userid;
@@ -187,16 +176,13 @@ public class JailbreakPlugin : BasePlugin
         {
             if (!player.IsValid || !player.PawnIsAlive) return;
 
-            // Tum silahlari temizle
             player.RemoveWeapons();
 
-            // T takimi sadece bicak + varsayilan olarak susturulmus
             if (player.Team == CsTeam.Terrorist)
             {
                 player.GiveNamedItem("weapon_knife");
                 SetVoiceMuted(player, true);
             }
-            // CT takimi varsayilan silahlari + sesi acik
             else if (player.Team == CsTeam.CounterTerrorist)
             {
                 player.GiveNamedItem("weapon_deagle");
@@ -209,61 +195,54 @@ public class JailbreakPlugin : BasePlugin
         return HookResult.Continue;
     }
 
-    // ================== ctrev: CT olum aninda paylasimli hak varsa otomatik rev ==================
     private HookResult OnPlayerDeath(EventPlayerDeath @event, GameEventInfo info)
     {
         var victim = @event.Userid;
         if (victim == null || !victim.IsValid)
             return HookResult.Continue;
 
-        if (victim.Team == CsTeam.CounterTerrorist && _ctRevRemaining > 0)
+        if (victim.Team != CsTeam.CounterTerrorist || _ctRevRemaining <= 0)
+            return HookResult.Continue;
+
+        _ctRevRemaining--;
+        int kalan = _ctRevRemaining;
+        string victimName = victim.PlayerName;
+
+        AddTimer(1.0f, () =>
         {
-            _ctRevRemaining--;
-            int kalan = _ctRevRemaining;
-            string victimName = victim.PlayerName;
+            if (!victim.IsValid || victim.PawnIsAlive) return;
 
-            AddTimer(0.3f, () =>
+            try
             {
-                if (victim.IsValid)
-                {
-                    victim.Respawn();
-                }
-            });
-
-            Server.PrintToChatAll($" \x04[JB]\x01 {victimName} kisisi revlenmistir ve {kalan} hak kalmistir.");
-        }
+                victim.Respawn();
+                Server.PrintToChatAll($" {ChatColors.Green}[JB]{ChatColors.Default} {ChatColors.Lime}{victimName}{ChatColors.Default} kişisi {ChatColors.Gold}revlenmiştir{ChatColors.Default} ve {ChatColors.Yellow}{kalan}{ChatColors.Default} hak kalmıştır.");
+            }
+            catch { }
+        });
 
         return HookResult.Continue;
     }
 
-    // ================== 5) !hucre1 ile kapi acma ==================
     private void OpenAllDoors()
     {
         foreach (var door in Utilities.FindAllEntitiesByDesignerName<CBaseEntity>("prop_door_rotating"))
-        {
             door.AcceptInput("Open");
-        }
+
         foreach (var door in Utilities.FindAllEntitiesByDesignerName<CBaseEntity>("func_door"))
-        {
             door.AcceptInput("Open");
-        }
+
         foreach (var door in Utilities.FindAllEntitiesByDesignerName<CBaseEntity>("func_door_rotating"))
-        {
             door.AcceptInput("Open");
-        }
+
         foreach (var btn in Utilities.FindAllEntitiesByDesignerName<CBaseEntity>("func_button"))
-        {
             btn.AcceptInput("Press");
-        }
     }
 
-    // ================== 8) Round basi komutlari + ctrev haklarini yenile ==================
     private HookResult OnRoundStart(EventRoundStart @event, GameEventInfo info)
     {
         Server.ExecuteCommand("sv_gravity 800");
         Server.ExecuteCommand("mp_teammates_are_enemies 0");
 
-        // Her round basinda CT'nin ortak rev hakki 3'e sifirlanir
         _ctRevRemaining = CtRevDefaultCharges;
 
         return HookResult.Continue;
