@@ -31,6 +31,9 @@ public class JailbreakPlugin : BasePlugin
         RegisterEventHandler<EventPlayerSpawn>(OnPlayerSpawn);
         RegisterEventHandler<EventPlayerDeath>(OnPlayerDeath, HookMode.Post);
         RegisterEventHandler<EventRoundStart>(OnRoundStart);
+
+        // Oyuncu sunucuya girince otomatik T yap
+        RegisterListener<Listeners.OnClientPutInServer>(OnClientPutInServer);
     }
 
     // ================== 1) /jointeam ENGELLE ==================
@@ -43,11 +46,10 @@ public class JailbreakPlugin : BasePlugin
         {
             player.ChangeTeam(CsTeam.Terrorist);
         }
-        return HookResult.Stop; // komutu tamamen engelle
+        return HookResult.Stop;
     }
 
-    [GameEventHandler]
-    public void OnClientPutInServer(int slot)
+    private void OnClientPutInServer(int slot)
     {
         var player = Utilities.GetPlayerFromSlot(slot);
         if (player == null) return;
@@ -95,14 +97,12 @@ public class JailbreakPlugin : BasePlugin
                 return HookResult.Handled;
         }
 
-        // Diger tum mesajlar serbest, kisitlama yok
         return HookResult.Continue;
     }
 
     // ================== T takimi ses kisitlamasi: !mute / !unmute ==================
     private void HandleUnmute(CCSPlayerController caller, string arg)
     {
-        // Arguman yoksa oyuncu kendi sesini aciyor (T takiminin varsayilan susturmayi kaldirmasi icin)
         if (string.IsNullOrEmpty(arg))
         {
             SetVoiceMuted(caller, false);
@@ -110,7 +110,6 @@ public class JailbreakPlugin : BasePlugin
             return;
         }
 
-        // Baska birini hedeflemek icin @css/generic yetkisi gerekir
         if (!AdminManager.PlayerHasPermissions(caller, "@css/generic"))
         {
             caller.PrintToChat(" \x04[JB]\x01 Bu islem icin yetkin yok.");
@@ -130,7 +129,6 @@ public class JailbreakPlugin : BasePlugin
 
     private void HandleMute(CCSPlayerController caller, string arg)
     {
-        // !mute her zaman @css/generic yetkisi ister
         if (!AdminManager.PlayerHasPermissions(caller, "@css/generic"))
         {
             caller.PrintToChat(" \x04[JB]\x01 Bu islem icin yetkin yok.");
@@ -182,26 +180,23 @@ public class JailbreakPlugin : BasePlugin
     private HookResult OnPlayerSpawn(EventPlayerSpawn @event, GameEventInfo info)
     {
         var player = @event.Userid;
-        if (player == null || !player.IsValid || player.PawnIsAlive == false)
+        if (player == null || !player.IsValid || !player.PawnIsAlive)
             return HookResult.Continue;
 
         AddTimer(0.1f, () =>
         {
-            if (!player.IsValid || player.PawnIsAlive == false) return;
+            if (!player.IsValid || !player.PawnIsAlive) return;
 
-            var pawn = player.PlayerPawn.Value;
-            if (pawn == null) return;
+            // Tum silahlari temizle
+            player.RemoveWeapons();
 
-            // Tum silahlari at
-            pawn.WeaponServices?.RemoveWeapons();
-
-            // 6) T takimi sadece bicak + varsayilan olarak susturulmus
+            // T takimi sadece bicak + varsayilan olarak susturulmus
             if (player.Team == CsTeam.Terrorist)
             {
                 player.GiveNamedItem("weapon_knife");
                 SetVoiceMuted(player, true);
             }
-            // 7) CT takimi varsayilan silahlari + sesi acik
+            // CT takimi varsayilan silahlari + sesi acik
             else if (player.Team == CsTeam.CounterTerrorist)
             {
                 player.GiveNamedItem("weapon_deagle");
